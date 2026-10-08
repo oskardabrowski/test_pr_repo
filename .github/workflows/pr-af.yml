@@ -1,0 +1,38 @@
+name: PR-AF
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: Numer PR-a do sprawdzenia
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  pull-requests: write
+
+# Let the active review finish; cancelling the job would not cancel the API task.
+concurrency:
+  group: pr-af-${{ github.repository }}-${{ github.event.pull_request.number || inputs.pr_number }}
+  cancel-in-progress: false
+
+jobs:
+  review:
+    name: review
+    if: >-
+      github.repository == 'oskardabrowski/test_pr_repo' &&
+      (github.event_name == 'workflow_dispatch' ||
+       (!github.event.pull_request.draft &&
+        github.event.pull_request.head.repo.full_name == github.repository))
+    runs-on: [self-hosted, linux, x64, pr-af]
+    timeout-minutes: 75
+    steps:
+      - name: Sprawdź PR i opublikuj uwagi
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number || inputs.pr_number }}
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha }}
+        run: python3 /usr/local/lib/pr-af-review.py
